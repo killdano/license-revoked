@@ -1,0 +1,139 @@
+name: Build
+
+# Builds the .pbw on every push to main and to the coder's claude/ branches.
+# Test builds (claude/ branches) are stamped 9.N.0 so the Pebble app never
+# ignores an install for having the same version as the one already on the
+# watch. Delivery (Releases page, install on the watch, PR comment) happens
+# in deliver.yml, which runs from main and is the only place PEBBLE_LOGIN is
+# used.
+
+on:
+  push:
+    branches: ['main', 'claude/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pbw:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Cache the Pebble SDK
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/share/pebble-sdk
+          key: pebble-sdk-${{ runner.os }}-v1
+
+      - name: Install the Pebble SDK
+        run: |
+          pip install uv pebble-tool
+          if ! yes | pebble sdk install latest > sdk.log 2>&1 && ! grep -q "already installed" sdk.log; then
+            cat sdk.log
+            echo "::error title=Pebble SDK install failed::$(tail -20 sdk.log | sed 's/%/%25/g' | sed ':a;N;$!ba;s/\n/%0A/g')"
+            exit 1
+          fi
+          echo "::notice title=Pebble SDK::$(pebble sdk list 2>&1 | head -8 | sed ':a;N;$!ba;s/\n/%0A/g')"
+
+      - name: Stamp the test-build version
+        if: startsWith(github.ref, 'refs/heads/claude/')
+        env:
+          RUN: ${{ github.run_number }}
+        run: |
+          node -e '
+            const fs = require("fs");
+            const p = JSON.parse(fs.readFileSync("package.json", "utf8"));
+            p.version = "9." + (Number(process.env.RUN) % 250) + ".0";
+            fs.writeFileSync("package.json", JSON.stringify(p, null, 2) + "\n");
+            console.log("test build version " + p.version);
+          '
+
+      - name: Build
+        run: |
+          set -o pipefail
+          pebble build 2>&1 | tee build.log
+
+      # Claude Code sessions can read check-run annotations but not Actions
+      # logs, so the tail of a failed build is surfaced as an annotation.
+      - name: Report a failed build
+        if: failure()
+        run: |
+          [ -f build.log ] || exit 0
+          python3 - <<'EOF'
+          lines = open('build.log', errors='replace').read().splitlines()[-40:]
+          msg = '%0A'.join(l.replace('%', '%25').replace('\r', '') for l in lines)
+          print('::error title=pebble build failed::' + msg)
+          EOF
+
+      - name: Check the build
+        env:
+          BRANCH: ${{ github.ref_name }}
+          SHA: ${{ github.sha }}
+        run: |
+          python3 - <<'EOF'
+          import glob, json, os, re, zipfile
+
+          pbw = glob.glob('build/*.pbw')[0]
+          pkg = json.load(open('package.json'))
+          want = {k: pkg['pebble'][k]
+                  for k in ('shareTarget', 'notificationFilter', 'companionApp',
+                            'manifestVersion', 'usesPermissions')
+                  if k in pkg['pebble']}
+
+          with zipfile.ZipFile(pbw) as z:
+              info = json.loads(z.read('appinfo.json'))
+              missing = [k for k in want if k not in info]
+              if missing:
+                  info.update({k: want[k] for k in missing})
+                  tmp = pbw + '.tmp'
+                  with zipfile.ZipFile(tmp, 'w', zipfile.ZIP_DEFLATED) as out:
+                      for item in z.infolist():
+                          if item.filename == 'appinfo.json':
+                              out.writestr(item, json.dumps(info, indent=2))
+                          else:
+                              out.writestr(item, z.read(item.filename))
+          if missing:
+              os.replace(tmp, pbw)
+              companion = 'patched in after build (SDK dropped: %s)' % ', '.join(missing)
+              print('::warning::' + companion)
+          else:
+              companion = 'ok'
+
+          debug_on = []
+          for path in glob.glob('src/c/*.c') + glob.glob('src/c/*.h'):
+              debug_on += re.findall(r'#define\s+(MM_DEBUG_\w+)\s+1\b', open(path).read())
+          for path in glob.glob('src/pkjs/*.js'):
+              debug_on += re.findall(r'var\s+(MM_DEBUG_\w+)\s*=\s*true\b', open(path).read())
+          if debug_on:
+              print('::warning::debug flags on: ' + ', '.join(debug_on))
+
+          json.dump({'version': pkg['version'],
+                     'branch': os.environ['BRANCH'],
+                     'sha': os.environ['SHA'],
+                     'pbw': os.path.basename(pbw),
+                     'companion': companion,
+                     'debug_on': debug_on},
+                    open('build/build-info.json', 'w'), indent=2)
+          print('::notice title=Build::%s %s, %d bytes, appinfo fields: %s%s' % (
+              os.path.basename(pbw), pkg['version'], os.path.getsize(pbw), companion,
+              ', debug flags on: ' + ', '.join(debug_on) if debug_on else ''))
+          EOF
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pbw
+          path: |
+            build/*.pbw
+            build/build-info.json
+          retention-days: 30

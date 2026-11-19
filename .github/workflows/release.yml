@@ -1,0 +1,220 @@
+name: Release
+
+# Publishes License Revoked to the Pebble appstore. A publish goes live at once.
+#
+# - Every Monday: publishes if anything in src/, resources/, package.json or
+#   wscript changed on main since the last v* tag. It never makes the first
+#   release; that one is started by hand.
+# - Run workflow (Actions tab → Release): publishes now, with optional
+#   release notes, or a dry run that builds and checks without publishing.
+# - A push to main that changes this file only checks that the Pebble login
+#   works and owns License Revoked's appstore listing.
+#
+# Release notes come from "## Unreleased" in CHANGELOG.md. The version goes
+# up by one minor step (0.9 → 0.10 → 0.11 …), is committed to main and
+# tagged v<version>, and the .pbw is attached to a GitHub release.
+
+on:
+  schedule:
+    - cron: '17 17 * * 1'
+  workflow_dispatch:
+    inputs:
+      notes:
+        description: 'Release notes (empty: use CHANGELOG.md)'
+        required: false
+        default: ''
+      dry_run:
+        description: 'Build and check everything, but do not publish'
+        type: boolean
+        default: false
+  push:
+    branches: [main]
+    paths: ['.github/workflows/release.yml']
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Decide what to do
+        id: plan
+        env:
+          EVENT: ${{ github.event_name }}
+          DRY: ${{ inputs.dry_run }}
+        run: |
+          LAST=$(git describe --tags --abbrev=0 --match 'v*' 2>/dev/null || true)
+          CHANGED=unknown
+          if [ -n "$LAST" ]; then
+            CHANGED=$(git diff --name-only "$LAST" HEAD -- src resources package.json wscript | wc -l)
+          fi
+          MODE=publish
+          REASON=""
+          if [ "$EVENT" = push ]; then
+            MODE=check
+          elif [ "$EVENT" = schedule ] && [ -z "$LAST" ]; then
+            MODE=skip; REASON="no v* tag yet: the first release is started by hand"
+          elif [ "$EVENT" = schedule ] && [ "$CHANGED" = 0 ]; then
+            MODE=skip; REASON="nothing in the app changed since $LAST"
+          elif [ "$DRY" = true ]; then
+            MODE=dry
+          fi
+          echo "mode=$MODE" >> "$GITHUB_OUTPUT"
+          echo "::notice title=Release::mode $MODE, last release ${LAST:-none}, files changed $CHANGED${REASON:+, $REASON}"
+
+      - uses: actions/setup-python@v5
+        if: steps.plan.outputs.mode != 'skip'
+        with:
+          python-version: '3.12'
+
+      - name: Pebble login and appstore listing
+        if: steps.plan.outputs.mode != 'skip'
+        env:
+          PEBBLE_LOGIN: ${{ secrets.PEBBLE_LOGIN }}
+        run: |
+          if [ -z "$PEBBLE_LOGIN" ]; then echo "::error title=Release::No PEBBLE_LOGIN secret"; exit 1; fi
+          pip install -q uv pebble-tool
+          DIR=$(python -c 'from pebble_tool.firebase_account import get_default_firebase_account as g; print(g().persistent_dir)')
+          printf '%s' "$PEBBLE_LOGIN" > "$DIR/firebase_oauth_storage.json"
+          python - <<'EOF'
+          import json, sys
+          from pebble_tool.firebase_account import get_default_firebase_account, DEFAULT_APPSTORE_API_BASE
+          from pebble_tool.commands.publish import PublishCommand
+          uuid = json.load(open('package.json'))['pebble']['uuid']
+          token = get_default_firebase_account().get_access_token()
+          me = PublishCommand._get_me_context(DEFAULT_APPSTORE_API_BASE, token)
+          if not me or not PublishCommand._has_linked_developer(me):
+              print('::error title=Appstore::This Pebble login has no developer account. Refusing to publish: pebble publish would create one and a new listing.')
+              sys.exit(1)
+          lookup = (me.get('app_lookup') or {}).get('by_app_uuid') or {}
+          app_id = PublishCommand._lookup_app_id_case_insensitive(lookup, uuid)
+          if not app_id:
+              print('::error title=Appstore::This Pebble login does not own the License Revoked listing (uuid %s). Refusing to publish: pebble publish would create a second listing.' % uuid)
+              sys.exit(1)
+          print('::notice title=Appstore::Login owns the License Revoked listing (app %s)' % app_id)
+          EOF
+
+      - name: Next version and release notes
+        id: ver
+        if: steps.plan.outputs.mode == 'publish' || steps.plan.outputs.mode == 'dry'
+        env:
+          INPUT_NOTES: ${{ inputs.notes }}
+        run: |
+          python3 - <<'EOF' >> "$GITHUB_OUTPUT"
+          import json, os, re
+          pkg = json.load(open('package.json'))
+          major, minor = [int(x) for x in pkg['version'].split('.')[:2]]
+          minor += 1
+          if minor >= 100:
+              major, minor = major + 1, 0
+          label = '%d.%d' % (major, minor)
+          pkg['version'] = label + '.0'
+          json.dump(pkg, open('package.json', 'w'), indent=4, ensure_ascii=False)
+          open('package.json', 'a').write('\n')
+
+          notes = os.environ.get('INPUT_NOTES', '').strip()
+          if not notes and os.path.exists('CHANGELOG.md'):
+              text = open('CHANGELOG.md').read()
+              m = re.search(r'^## Unreleased\s*\n(.*?)(?=^## |\Z)', text, re.S | re.M)
+              if m:
+                  lines = [l.strip() for l in m.group(1).splitlines()
+                           if l.strip() and not l.strip().startswith('<!--')]
+                  notes = '\n'.join(lines)
+          if not notes:
+              notes = 'Bug fixes and improvements.'
+          notes += ('\n\nAndroid version (free, sideload): '
+                    'https://github.com/killdano/license-revoked/releases/download/android/LicenseRevoked-android.apk')
+          open('release-notes.txt', 'w').write(notes + '\n')
+          print('label=' + label)
+          EOF
+          echo "::notice title=Release::version $(grep -o '"version": "[^"]*"' package.json | tail -1)"
+          cat release-notes.txt
+
+      - name: Cache the Pebble SDK
+        if: steps.ver.outputs.label
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/share/pebble-sdk
+          key: pebble-sdk-${{ runner.os }}-v1
+
+      - name: Install the Pebble SDK
+        if: steps.ver.outputs.label
+        run: |
+          if ! yes | pebble sdk install latest > sdk.log 2>&1 && ! grep -q "already installed" sdk.log; then
+            cat sdk.log
+            echo "::error title=Pebble SDK install failed::$(tail -20 sdk.log | sed 's/%/%25/g' | sed ':a;N;$!ba;s/\n/%0A/g')"
+            exit 1
+          fi
+
+      - name: Build
+        if: steps.ver.outputs.label
+        run: |
+          set -o pipefail
+          pebble build 2>&1 | tee build.log
+          python3 - <<'EOF'
+          import glob, json, sys, zipfile
+          pbw = glob.glob('build/*.pbw')[0]
+          want = ()
+          info = json.loads(zipfile.ZipFile(pbw).read('appinfo.json'))
+          missing = [k for k in want if k not in info]
+          if missing:
+              print('::error title=Release::.pbw appinfo.json is missing ' + ', '.join(missing))
+              sys.exit(1)
+          print('::notice title=Release::built %s, version %s, appinfo fields ok' % (pbw, info.get('versionLabel')))
+          EOF
+
+      - name: Report a failed build
+        if: failure() && hashFiles('build.log') != ''
+        run: |
+          python3 - <<'EOF'
+          lines = open('build.log', errors='replace').read().splitlines()[-40:]
+          print('::error title=pebble build failed::' + '%0A'.join(l.replace('%', '%25') for l in lines))
+          EOF
+
+      - name: Publish to the Pebble appstore
+        if: steps.plan.outputs.mode == 'publish'
+        env:
+          LABEL: ${{ steps.ver.outputs.label }}
+        run: |
+          PBW=$(ls build/*.pbw | head -1)
+          pebble publish --pbw "$PBW" --non-interactive --version "$LABEL" --release-notes "$(cat release-notes.txt)"
+
+      - name: Record the release
+        if: steps.plan.outputs.mode == 'publish'
+        env:
+          LABEL: ${{ steps.ver.outputs.label }}
+        run: |
+          python3 - <<'EOF'
+          import datetime, os, re
+          label = os.environ['LABEL']
+          if os.path.exists('CHANGELOG.md'):
+              text = open('CHANGELOG.md').read()
+              m = re.search(r'^## Unreleased\s*\n(.*?)(?=^## |\Z)', text, re.S | re.M)
+              if m:
+                  body = '\n'.join(l for l in m.group(1).splitlines()
+                                   if l.strip() and not l.strip().startswith('<!--'))
+                  head = '## Unreleased\n\n<!-- One line per user-visible change, in plain words. -->\n\n'
+                  entry = '## %s (%s)\n\n%s\n\n' % (label, datetime.date.today().isoformat(), body or '- Bug fixes and improvements.')
+                  text = text[:m.start()] + head + entry + text[m.end():]
+                  open('CHANGELOG.md', 'w').write(text)
+          EOF
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json CHANGELOG.md
+          git commit -m "Release $LABEL"
+          git tag "v$LABEL"
+          git push origin HEAD:main "v$LABEL"
+          cp "$(ls build/*.pbw | head -1)" "LicenseRevoked-$LABEL.pbw"
+          gh release create "v$LABEL" "LicenseRevoked-$LABEL.pbw" --title "License Revoked $LABEL" --notes-file release-notes.txt
