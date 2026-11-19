@@ -1,0 +1,12 @@
+build/
+.lock-waf*
+*.pbw
+android/.gradle/
+android/app/build/
+android/app/.cxx/
+android/local.properties
+android/keystore.properties
+*.jks
+*.keystore
+tools/hostcheck/*.o
+tools/hostcheck/hostcheck
