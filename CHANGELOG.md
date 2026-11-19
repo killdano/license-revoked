@@ -1,6 +1,11 @@
 # Changelog
 
 ## Unreleased
+
+<!-- One line per user-visible change, in plain words. -->
+
+## 0.2 (2026-11-19)
+
 - A whole new world: two procedural islands with beaches, diagonal streets, and a highway bridge between them.
 - Boats: jet ski, motorboat, yacht and police boat, with marinas and jetties. The marine police come for you on the water.
 - New vehicles: jeep and motorcycle, more car types, crashes with real physics, and cars that explode.
@@ -11,3 +16,4 @@
 - Real sound: engines, sirens, gunshots, voices and city noise.
 - Smoother controls: floating touch stick, faster running, a closer camera all the way down to a street-level chase cam, and a pause menu with zoom.
 - Lots of stability fixes for roads, traffic and the camera.
+

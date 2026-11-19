@@ -1,154 +1,154 @@
 {
-  "name": "wrist-revoked",
-  "author": "Dan",
-  "version": "0.1.0",
-  "keywords": [
-    "pebble-app"
-  ],
-  "private": true,
-  "dependencies": {},
-  "pebble": {
-    "displayName": "License Revoked",
-    "uuid": "6f2a1c48-3d90-4b27-9e51-8a7c4d2f0b13",
-    "sdkVersion": "3",
-    "enableMultiJS": false,
-    "targetPlatforms": [
-      "emery"
+    "name": "wrist-revoked",
+    "author": "Dan",
+    "version": "0.2.0",
+    "keywords": [
+        "pebble-app"
     ],
-    "watchapp": {
-      "watchface": false,
-      "hiddenApp": false,
-      "onlyShownOnCommunication": false
-    },
-    "messageKeys": [],
-    "resources": {
-      "media": [
-        {
-          "type": "raw",
-          "name": "DOM_CITY",
-          "file": "dom_city.bin"
+    "private": true,
+    "dependencies": {},
+    "pebble": {
+        "displayName": "License Revoked",
+        "uuid": "6f2a1c48-3d90-4b27-9e51-8a7c4d2f0b13",
+        "sdkVersion": "3",
+        "enableMultiJS": false,
+        "targetPlatforms": [
+            "emery"
+        ],
+        "watchapp": {
+            "watchface": false,
+            "hiddenApp": false,
+            "onlyShownOnCommunication": false
         },
-        {
-          "type": "raw",
-          "name": "DOM_GHETTO",
-          "file": "dom_ghetto.bin"
-        },
-        {
-          "type": "raw",
-          "name": "DOM_COAST",
-          "file": "dom_coast.bin"
-        },
-        {
-          "type": "raw",
-          "name": "DOM_CLUB",
-          "file": "dom_club.bin"
-        },
-        {
-          "type": "raw",
-          "name": "DOM_STORE",
-          "file": "dom_store.bin"
-        },
-        {
-          "type": "raw",
-          "name": "DOM_DINER",
-          "file": "dom_diner.bin"
-        },
-        {
-          "type": "raw",
-          "name": "DOM_AIR",
-          "file": "dom_t_air.bin"
-        },
-        {
-          "type": "raw",
-          "name": "DOM_TAXI",
-          "file": "dom_t_taxi.bin"
-        },
-        {
-          "type": "raw",
-          "name": "DOM_AIRPORT",
-          "file": "dom_airport.bin"
-        },
-        {
-          "type": "raw",
-          "name": "DOM_MENU",
-          "file": "dom_menu.bin"
-        },
-        {
-          "type": "raw",
-          "name": "DOM_H_MELEE",
-          "file": "dom_h_melee.bin"
-        },
-        {
-          "type": "raw",
-          "name": "DOM_H_GUNS",
-          "file": "dom_h_guns.bin"
-        },
-        {
-          "type": "raw",
-          "name": "DOM_H_FLAME",
-          "file": "dom_h_flame.bin"
-        },
-        {
-          "type": "raw",
-          "name": "DOM_H_ROCKET",
-          "file": "dom_h_rocket.bin"
-        },
-        {
-          "type": "raw",
-          "name": "DOM_H_CAR",
-          "file": "dom_h_car.bin"
-        },
-        {
-          "type": "raw",
-          "name": "DOM_H_BOARD",
-          "file": "dom_h_board.bin"
-        },
-        {
-          "type": "raw",
-          "name": "DOM_H_GRENADE",
-          "file": "dom_h_grenade.bin"
-        },
-        {
-          "type": "raw",
-          "name": "DOM_AIRSIDE",
-          "file": "dom_airside.bin"
-        },
-        {
-          "type": "raw",
-          "name": "DOM_ARREST",
-          "file": "dom_t_arrest.bin"
-        },
-        {
-          "type": "raw",
-          "name": "DOM_H_FLY",
-          "file": "dom_h_fly.bin"
-        },
-        {
-          "type": "raw",
-          "name": "DOM_GUARD",
-          "file": "dom_t_guard.bin"
-        },
-        {
-          "type": "raw",
-          "name": "DOM_H_DEAD",
-          "file": "dom_h_dead.bin"
-        },
-        {
-          "type": "raw",
-          "name": "DOM_SECRET",
-          "file": "dom_secret.bin"
-        },
-        {
-          "type": "raw",
-          "name": "DOM_HOME",
-          "file": "dom_home.bin"
-        },
-        {
-          "type": "raw",
-          "name": "DOM_ISLAND",
-          "file": "dom_t_island.bin"
+        "messageKeys": [],
+        "resources": {
+            "media": [
+                {
+                    "type": "raw",
+                    "name": "DOM_CITY",
+                    "file": "dom_city.bin"
+                },
+                {
+                    "type": "raw",
+                    "name": "DOM_GHETTO",
+                    "file": "dom_ghetto.bin"
+                },
+                {
+                    "type": "raw",
+                    "name": "DOM_COAST",
+                    "file": "dom_coast.bin"
+                },
+                {
+                    "type": "raw",
+                    "name": "DOM_CLUB",
+                    "file": "dom_club.bin"
+                },
+                {
+                    "type": "raw",
+                    "name": "DOM_STORE",
+                    "file": "dom_store.bin"
+                },
+                {
+                    "type": "raw",
+                    "name": "DOM_DINER",
+                    "file": "dom_diner.bin"
+                },
+                {
+                    "type": "raw",
+                    "name": "DOM_AIR",
+                    "file": "dom_t_air.bin"
+                },
+                {
+                    "type": "raw",
+                    "name": "DOM_TAXI",
+                    "file": "dom_t_taxi.bin"
+                },
+                {
+                    "type": "raw",
+                    "name": "DOM_AIRPORT",
+                    "file": "dom_airport.bin"
+                },
+                {
+                    "type": "raw",
+                    "name": "DOM_MENU",
+                    "file": "dom_menu.bin"
+                },
+                {
+                    "type": "raw",
+                    "name": "DOM_H_MELEE",
+                    "file": "dom_h_melee.bin"
+                },
+                {
+                    "type": "raw",
+                    "name": "DOM_H_GUNS",
+                    "file": "dom_h_guns.bin"
+                },
+                {
+                    "type": "raw",
+                    "name": "DOM_H_FLAME",
+                    "file": "dom_h_flame.bin"
+                },
+                {
+                    "type": "raw",
+                    "name": "DOM_H_ROCKET",
+                    "file": "dom_h_rocket.bin"
+                },
+                {
+                    "type": "raw",
+                    "name": "DOM_H_CAR",
+                    "file": "dom_h_car.bin"
+                },
+                {
+                    "type": "raw",
+                    "name": "DOM_H_BOARD",
+                    "file": "dom_h_board.bin"
+                },
+                {
+                    "type": "raw",
+                    "name": "DOM_H_GRENADE",
+                    "file": "dom_h_grenade.bin"
+                },
+                {
+                    "type": "raw",
+                    "name": "DOM_AIRSIDE",
+                    "file": "dom_airside.bin"
+                },
+                {
+                    "type": "raw",
+                    "name": "DOM_ARREST",
+                    "file": "dom_t_arrest.bin"
+                },
+                {
+                    "type": "raw",
+                    "name": "DOM_H_FLY",
+                    "file": "dom_h_fly.bin"
+                },
+                {
+                    "type": "raw",
+                    "name": "DOM_GUARD",
+                    "file": "dom_t_guard.bin"
+                },
+                {
+                    "type": "raw",
+                    "name": "DOM_H_DEAD",
+                    "file": "dom_h_dead.bin"
+                },
+                {
+                    "type": "raw",
+                    "name": "DOM_SECRET",
+                    "file": "dom_secret.bin"
+                },
+                {
+                    "type": "raw",
+                    "name": "DOM_HOME",
+                    "file": "dom_home.bin"
+                },
+                {
+                    "type": "raw",
+                    "name": "DOM_ISLAND",
+                    "file": "dom_t_island.bin"
+                }
+            ]
         }
-      ]
     }
-  }
 }
