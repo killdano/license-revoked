@@ -29,3 +29,9 @@ keys, tokens, access codes or anything private in it.
 - Reference GTA 1 for any gameplay question he hasn't answered.
 - Keep the watch build within its memory limits; measure, don't guess.
 - A clean build is not a tested game: say what you couldn't check.
+- Showing work on Dan's status page (Dan, 2026-11-23): if your session has
+  the MirrorApps desk connector, call its `crew_busy` tool when you start
+  work here (app `license-revoked`, or `license-revoked-android` for the
+  phone build; `who` as Dan would say it, e.g. "Claude in chat"), again
+  every half hour or so, and with `done: true` when you stop. Without the
+  connector, skip it.
