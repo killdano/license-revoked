@@ -92,7 +92,7 @@ static void draw_room_lot(int i, const uint8_t *pal) {
 static void draw_hud_in(GContext *ctx) {
   if (!g_in.wait) return;
   graphics_context_set_fill_color(ctx, GColorBlack);
-  graphics_fill_rect(ctx, GRect(0, 0, SCR_W * 228 / SCR_H, 228), 0, GCornerNone);
+  graphics_fill_rect(ctx, GRect(0, 0, HUD_W, HUD_H), 0, GCornerNone);
 }
 
 static int action(void) {

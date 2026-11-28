@@ -18,9 +18,7 @@ uint32_t g_frame = 0;
 #define C_LINE_W   ARGB(3,3,3)   // white paint: stop bars, crosswalks
 #define C_LOT      ARGB(2,2,1)   // buildable ground, so gaps do not read as road
 #define C_PARK     ARGB(0,2,0)
-#define HUD_H 228
-#define HUD_W (SCR_W * 228 / SCR_H)
-#define L(v)  ((v) * 228 / SCR_H)
+#define L(v)  HUD_L(v)      // framebuffer to HUD space (HUD_W, HUD_H: wr.h)
 uint8_t g_park_col = C_PARK;
 uint8_t g_lot_col = C_LOT;
 #define C_SAND     ARGB(3,3,1)
@@ -729,8 +727,19 @@ static void hud_ring(GContext *ctx, int32_t x, int32_t y, int32_t r, GColor col)
   // measured from his heading sat 25 degrees wrong - 50 when mirrored.
   uint16_t cam = (uint16_t)(g_p.ang + (g_menu.cam_left ? -CAM_YAW_OFF : CAM_YAW_OFF));
   int32_t rel = (int16_t)(uint16_t)(angle_to(g_p.x, g_p.y, x, y) - cam);
+#if WR_ROUND
+  // The panel is the HUD's space here. Kept inside the circle: a dot past
+  // the bezel is a dot nobody sees.
+  r = PX(r);
+  int32_t px = s_proj_cx + ((fsin((uint16_t)rel) * r) >> 10);
+  int32_t py = PX(140) - ((fcos((uint16_t)rel) * r) >> 10);
+  int32_t dx = px - HUD_RC, dy = py - HUD_RC, d = wr_sqrt(dx * dx + dy * dy);
+  if (d > HUD_RC - 12) { px = HUD_RC + dx * (HUD_RC - 12) / d; py = HUD_RC + dy * (HUD_RC - 12) / d; }
+  GPoint p = GPoint((int)px, (int)py);
+#else
   GPoint p = GPoint((int)(L(s_proj_cx) + ((fsin((uint16_t)rel) * r) >> 10)),   // logical space
                     (int)(140 - ((fcos((uint16_t)rel) * r) >> 10)));
+#endif
   graphics_context_set_fill_color(ctx, GColorBlack);
   graphics_fill_circle(ctx, p, 7);
   graphics_context_set_fill_color(ctx, col);
@@ -739,7 +748,12 @@ static void hud_ring(GContext *ctx, int32_t x, int32_t y, int32_t r, GColor col)
 
 void hud_marker(GContext *ctx, int32_t x, int32_t y, int32_t z, GColor col) {
   Proj p = gfx_project(x, y, z);
+#if WR_ROUND
+  int32_t mdx = p.sx - HUD_RC, mdy = p.sy - 10 - HUD_RC;
+  bool on = p.ok && mdx * mdx + mdy * mdy < (HUD_RC - 10) * (HUD_RC - 10);
+#else
   bool on = p.ok && p.sx >= 4 && p.sx < SCR_W - 4 && p.sy >= 4 && p.sy < SCR_H - 4;
+#endif
   if (!on) { if (g_frame & 4) hud_ring(ctx, x, y, 70, col); return; }
   int32_t sx = L(p.sx), sy = L(p.sy) - 10;      // projected in framebuffer space; drawn in the HUD's
   if (g_frame & 4) {
@@ -750,6 +764,24 @@ void hud_marker(GContext *ctx, int32_t x, int32_t y, int32_t z, GColor col) {
   }
 }
 
+#if WR_ROUND
+// The round watch's status bars follow the bezel, the way the system's own
+// round layouts do: an arc of the circle from deg a to deg b (0 at twelve
+// o'clock, clockwise), `inset` in from the edge and `thick` deep.
+static void hud_arc(GContext *ctx, int32_t a, int32_t b, int inset, int thick, GColor col) {
+  if (b <= a) return;
+  graphics_context_set_fill_color(ctx, col);
+  graphics_fill_radial(ctx, GRect(inset, inset, SCR_W - 2 * inset, SCR_H - 2 * inset),
+                       GOvalScaleModeFitCircle, (uint16_t)thick,
+                       DEG_TO_TRIGANGLE(a), DEG_TO_TRIGANGLE(b));
+}
+// A point on the circle `r` from the centre at deg a.
+static GPoint hud_polar(int32_t a, int32_t r) {
+  uint16_t t = (uint16_t)(a * 65536 / 360);
+  return GPoint((int)(HUD_RC + ((fsin(t) * r) >> 10)), (int)(HUD_RC - ((fcos(t) * r) >> 10)));
+}
+#endif
+
 WR_PART static void draw_hud(GContext *ctx) {
   graphics_context_set_fill_color(ctx, GColorBlack);
   // No bar at all. Dithering it still cluttered the readouts sitting on it,
@@ -758,6 +790,49 @@ WR_PART static void draw_hud(GContext *ctx) {
   // game visible.
   (void)0;
 
+#if WR_ROUND
+  // The top of the bezel carries what the Time 2 puts in a strip along its
+  // top edge, bent round the circle: wanted level on the left, the weapon
+  // and its ammunition in the middle, health and armour on the right.
+  graphics_context_set_fill_color(ctx, GColorBlack);
+  for (int i = 0; i < 5; i++) {                       // the wanted level's sockets
+    GPoint w = hud_polar(-20 - i * 8, HUD_RC - 10);
+    graphics_fill_circle(ctx, w, 5);
+  }
+  graphics_context_set_fill_color(ctx, GColorFolly);
+  for (int i = 0; i < g_p.wanted && i < 5; i++)
+    graphics_fill_circle(ctx, hud_polar(-20 - i * 8, HUD_RC - 10), 3);
+
+  {
+    char line[12]; int n = 0;
+    line[n++] = '$';
+    n += gfx_utoa(line + n, 8, g_p.cash);
+    line[n] = 0;
+    hud_text(ctx, line, FONT_KEY_GOTHIC_18_BOLD, HUD_RC - 40, 17, 80, 20, GColorWhite);
+    if (g_p.inside) domain_call(DOP_DRAW_HUD, (int)(intptr_t)ctx);
+  }
+
+  // Health, and armour drawn on it: one arc, blue over green.
+  hud_arc(ctx, 16, 54, 3, 10, GColorBlack);
+  hud_arc(ctx, 17, 53, 5, 6, GColorDarkGray);
+  hud_arc(ctx, 17, 17 + (g_p.hp * 36) / HP_MAX, 5, 6, g_p.hp > 30 ? GColorGreen : GColorRed);
+  if (g_p.armor) {
+    bool mil = g_p.armor > ARMOR_MAX;
+    int aw = mil ? 36 : (g_p.armor * 36) / ARMOR_MAX;
+    hud_arc(ctx, 17, 17 + aw, 5, 6, mil ? GColorGreen : GColorPictonBlue);
+    if (aw < 36) hud_arc(ctx, 17 + aw, 18 + aw, 5, 6, GColorBlack);   // the vest's edge
+  }
+
+  // The weapon's colour and its rounds, as ticks round the top.
+  {
+    GColor wc; wc.argb = WEPC[g_p.weapon];
+    hud_arc(ctx, -13, 12, 3, 10, GColorBlack);
+    hud_arc(ctx, -12, -6, 5, 6, wc);
+    int pips = g_p.ammo / 2; if (pips > 8) pips = 8;
+    for (int i = 0; i < pips; i++) hud_arc(ctx, -4 + i * 2, -3 + i * 2, 5, 6, GColorWhite);
+  }
+
+#else
   graphics_context_set_fill_color(ctx, GColorFolly);
   for (int i = 0; i < g_p.wanted; i++)
     graphics_fill_rect(ctx, GRect(4 + i * 9, 4, 6, 6), 1, GCornersAll);
@@ -809,6 +884,8 @@ WR_PART static void draw_hud(GContext *ctx) {
   for (int i = 0; i < pips; i++)
     graphics_fill_rect(ctx, GRect(HUD_W / 2 - 4 + i * 4, 5, 2, 5), 0, GCornerNone);
 
+#endif
+
   // The pad is always drawn, dim when idle, so it needs no tutorial. On foot
   // it is a ring; behind the wheel it collapses to a vertical slot, because
   // there is no steering on it while driving.
@@ -841,7 +918,18 @@ WR_PART static void draw_hud(GContext *ctx) {
   // Zoom strip. Pebble's touch API reports a single point with no finger id,
   // so a real two-finger pinch is not available - this is the single-touch
   // equivalent: drag anywhere on the right edge.
-#if !WR_ANDROID     // the phone pinches to zoom; no slider
+#if WR_ROUND
+  // The zoom slider is an arc down the bezel on its side. The touch strip
+  // (x past ZOOM_STRIP_X) is the same edge of the circle: 50 to 130 degrees.
+  {
+    int32_t a0 = g_menu.cam_left ? 240 : 60;
+    hud_arc(ctx, a0, a0 + 60, 2, 9, GColorBlack);
+    // Top = camera in close, bottom = pulled out, whichever side it is on.
+    int32_t k = (g_p.zoom * 54) / ZOOM_MAX;
+    int32_t ka = g_menu.cam_left ? a0 + 54 - k : a0 + k;
+    hud_arc(ctx, ka, ka + 6, 3, 7, g_p.zoom_on ? GColorWhite : GColorDarkGray);
+  }
+#elif !WR_ANDROID     // the phone pinches to zoom; no slider
   {
     int x = g_menu.cam_left ? 9 : HUD_W - 9;
     graphics_context_set_fill_color(ctx, GColorBlack);
@@ -860,9 +948,13 @@ WR_PART static void draw_hud(GContext *ctx) {
   if (g_menu.open) domain_call(DOP_DRAW_MENU, (int)(intptr_t)ctx);   // the menu is a PLACE domain
 
   if (g_p.hurt_flash || g_p.dead) {
+#if WR_ROUND
+    hud_arc(ctx, 0, 360, 0, 3, g_p.busted ? GColorBlue : GColorRed);   // the bezel, all round
+#else
     graphics_context_set_stroke_color(ctx, g_p.busted ? GColorBlue : GColorRed);
     graphics_draw_rect(ctx, GRect(0, 0, HUD_W, HUD_H));
     graphics_draw_rect(ctx, GRect(1, 1, HUD_W - 2, HUD_H - 2));
+#endif
   }
 
   // The caption for the cinematic: a moment of quiet, then the verdict, then
@@ -898,7 +990,12 @@ WR_PART static void draw_hud(GContext *ctx) {
       wn = g_p.heli_wep == 3 ? "LANDING" : g_p.heli_wep == 2 ? "LAND" : g_p.heli_wep ? "ROCKET" : "MG";
     else if (g_p.in_car && g_ent[g_p.in_car - 1].sub == CAR_TANK && g_ent[g_p.in_car - 1].type == ENT_COPCAR)
       wn = g_p.heli_wep ? "SHELL" : "MG";
+#if WR_ROUND
+    (void)wx;      // under the money, in the middle: a circle has no corners
+    hud_text(ctx, wn, FONT_KEY_GOTHIC_18_BOLD, HUD_RC - 40, 35, 80, 18, GColorWhite);
+#else
     hud_text(ctx, wn, FONT_KEY_GOTHIC_18_BOLD, wx + 2, 21, 52, 18, GColorWhite);
+#endif
 
     // No round count here - the bar along the top already carries it, and
     // two readouts of the same number is one too many.
@@ -923,9 +1020,16 @@ WR_PART static void draw_hud(GContext *ctx) {
     for (int k = g_p.caption % CAP_COUNT; k > 0; k--) { while (*cap) cap++; cap++; }
     // Tall enough to wrap: the price list is two lines.
     int ch = (g_p.caption == CAP_PRICES) ? 34 : 18;
+#if WR_ROUND
+#define CAP_X 30            // the chord the circle leaves below the readouts
+#define CAP_Y 74
+#else
+#define CAP_X 4
+#define CAP_Y 46
+#endif
     graphics_context_set_fill_color(ctx, GColorBlack);
-    graphics_fill_rect(ctx, GRect(4, 46, HUD_W - 8, ch), 3, GCornersAll);
-    hud_text(ctx, cap, FONT_KEY_GOTHIC_14_BOLD, 4, 46, HUD_W - 8, ch,
+    graphics_fill_rect(ctx, GRect(CAP_X, CAP_Y, HUD_W - 2 * CAP_X, ch), 3, GCornersAll);
+    hud_text(ctx, cap, FONT_KEY_GOTHIC_14_BOLD, CAP_X, CAP_Y, HUD_W - 2 * CAP_X, ch,
              g_p.caption == CAP_SWAT ? GColorRed : GColorWhite);
   }
 }

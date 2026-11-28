@@ -76,6 +76,23 @@ jobs:
           print('::error title=pebble build failed::' + msg)
           EOF
 
+      # The 64 KB ceiling (code + data + bss) is per platform: say where each
+      # one stands, and fail the build past it.
+      - name: Image sizes
+        run: |
+          SIZE=$(find ~/.local/share/pebble-sdk -name arm-none-eabi-size -type f | head -1)
+          [ -n "$SIZE" ] || { echo "::warning::arm-none-eabi-size not found"; exit 0; }
+          msg=""; over=0
+          for elf in build/*/pebble-app.elf; do
+            p=$(basename "$(dirname "$elf")")
+            t=$("$SIZE" "$elf" | awk 'NR==2 {print $1+$2+$3}')
+            msg="$msg $p ${t} B (free $((65535 - t)));"
+            [ "$t" -gt 65535 ] && over=1
+          done
+          grep -h '^arenas' build.log | sed 's/^/  /' || true
+          echo "::notice title=Image size::$msg"
+          [ "$over" = 0 ] || { echo "::error title=Image size::over 65535 B:$msg"; exit 1; }
+
       - name: Check the build
         env:
           BRANCH: ${{ github.ref_name }}

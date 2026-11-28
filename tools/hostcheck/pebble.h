@@ -113,6 +113,12 @@ void graphics_draw_text(GContext *ctx, const char *text, GFont font, GRect box,
                         GTextOverflowMode o, GTextAlignment a, void *attr);
 #define GColorPictonBlue ((GColor){ .argb = 0xD7 })
 void graphics_fill_circle(GContext *ctx, GPoint p, uint16_t radius);
+// The round watch's bezel arcs (WR_ROUND builds only).
+typedef enum { GOvalScaleModeFitCircle, GOvalScaleModeFillCircle } GOvalScaleMode;
+#define TRIG_MAX_ANGLE 0x10000
+#define DEG_TO_TRIGANGLE(angle) (((angle) * TRIG_MAX_ANGLE) / 360)
+void graphics_fill_radial(GContext *ctx, GRect rect, GOvalScaleMode mode, uint16_t inset,
+                          int32_t angle_start, int32_t angle_end);
 static inline GPoint GPoint_(int16_t x, int16_t y){ GPoint p={x,y}; return p; }
 #define GPoint(x,y) GPoint_((int16_t)(x),(int16_t)(y))
 #define GColorLightGray ((GColor){ .argb = 0xEA })

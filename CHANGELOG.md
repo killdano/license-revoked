@@ -4,6 +4,8 @@
 
 <!-- One line per user-visible change, in plain words. -->
 
+- Now plays on the Pebble Round 2, with its health, wanted level, ammo and zoom bars curved around the round screen.
+
 ## 0.6 (2026-11-19)
 
 - License Revoked now has an Android version, free to sideload (link below).

@@ -141,8 +141,14 @@ void game_touch_down(int16_t sx, int16_t sy) {
     // The hit area must match the plate that is drawn - 30 x 20 since the
     // name became an icon. It was still 56 x 30, so a tap well outside the
     // visible box silently changed weapon.
+#if WR_ROUND
+    // On the round watch the name sits in the middle, under the money.
+    int wx = SCR_W / 2 - 40;
+    if (sx >= wx && sx <= wx + 80 && sy >= 33 && sy <= 56 && !g_p.dead) {
+#else
     int wx = g_menu.cam_left ? (SCR_W - PX(62)) : PX(6);
     if (sx >= wx && sx <= wx + PX(56) && sy >= PX(24) && sy <= PX(44) && !g_p.dead) {
+#endif
       weapon_next();
       g_p.touch_used = 1;              // one press, one weapon: moves until liftoff do nothing
       return;

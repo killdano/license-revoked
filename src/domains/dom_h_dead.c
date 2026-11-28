@@ -56,11 +56,11 @@ static void respawn(void) {
 
 static void draw_verdict(GContext *ctx) {
   if (g_p.cine <= 16) return;
-  int hw = SCR_W * 228 / SCR_H;
+  int hw = HUD_W;
   graphics_context_set_fill_color(ctx, GColorBlack);
-  graphics_fill_rect(ctx, GRect(0, 82, hw, 40), 0, GCornerNone);
+  graphics_fill_rect(ctx, GRect(0, 82 + HUD_OY, hw, 40), 0, GCornerNone);
   hud_text(ctx, g_p.busted ? "FREEDOM REVOKED" : "LIFE REVOKED", FONT_KEY_GOTHIC_28_BOLD,
-           0, 84, hw, 32, g_p.busted ? GColorPictonBlue : GColorRed);
+           0, 84 + HUD_OY, hw, 32, g_p.busted ? GColorPictonBlue : GColorRed);
 }
 
 static int dom_dispatch(int op, int arg) {
