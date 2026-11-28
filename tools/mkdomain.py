@@ -11,12 +11,13 @@ possible: every address in the blob is already an offset.
 import subprocess, sys, struct, os, re
 
 src, out, cc = sys.argv[1], sys.argv[2], sys.argv[3]
+extra = sys.argv[4:]          # per-watch defines (the Round 2's screen), from the wscript
 tmp = out + '.tmp'
 inc = os.path.dirname(src)
 
 subprocess.run([cc, '-mcpu=cortex-m4', '-mthumb', '-Os', '-std=c11',
                 '-ffunction-sections', '-fdata-sections', '-fno-common', '-DWR_DOMAINS=1', '-DWR_MONOLITH=0',
-                '-I', inc, '-I', 'src/c', '-I', 'tools/hostcheck', '-c', src, '-o', tmp + '.o'], check=True)
+                '-I', inc, '-I', 'src/c', '-I', 'tools/hostcheck'] + extra + ['-c', src, '-o', tmp + '.o'], check=True)
 
 # .text.entry first, so the entry point is at offset 0.
 # Code and constants first, then the domain's own variables. A domain may

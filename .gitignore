@@ -10,3 +10,4 @@ android/keystore.properties
 *.keystore
 tools/hostcheck/*.o
 tools/hostcheck/hostcheck
+resources/*~*.bin

@@ -17,6 +17,26 @@
 #define WR_ANDROID 0
 #endif
 
+// Pebble Round 2 (gabbro): a 260x260 circle. The domain blobs are built
+// with -DWR_ROUND=1 -DSCR_W=260 -DSCR_H=260 by the wscript (they see the
+// host-check pebble.h, not the SDK's platform macros); the image gets it
+// from the SDK. Everything round-only sits behind WR_ROUND, so the Time 2
+// build compiles exactly what it did before.
+#if !defined(WR_ROUND) && defined(PBL_PLATFORM_GABBRO) && !WR_ANDROID
+#define WR_ROUND 1
+#endif
+#ifndef WR_ROUND
+#define WR_ROUND 0
+#endif
+#if WR_ROUND
+#ifndef SCR_W
+#define SCR_W 260
+#endif
+#ifndef SCR_H
+#define SCR_H 260
+#endif
+#endif
+
 #ifndef SCR_H
 #define SCR_H 228
 #endif
@@ -33,6 +53,27 @@ extern int g_scr_w;
 #endif
 #endif
 #define PX(v) ((v) * SCR_H / 228)
+
+// The HUD's drawing space. On the Time 2 and the phone it is the watch's
+// 200x228 (a phone scales the calls); on the round watch it is the panel
+// itself, and the layout follows the bezel (see draw_hud). HUD_OX/HUD_OY
+// centre a 200x228 layout (the pause menu, the map) in the circle.
+#if WR_ROUND
+#define HUD_W  SCR_W
+#define HUD_H  SCR_H
+#define HUD_L(v) (v)
+#define HUD_OX ((SCR_W - 200) / 2)
+#define HUD_OY ((SCR_H - 228) / 2)
+#define HUD_RC (SCR_W / 2)            // the circle's centre and radius
+#define HUD_IN_DY 22                  // a room's own line, below the weapon's name
+#else
+#define HUD_H 228
+#define HUD_W (SCR_W * 228 / SCR_H)
+#define HUD_L(v) ((v) * 228 / SCR_H)
+#define HUD_OX 0
+#define HUD_OY 0
+#define HUD_IN_DY 0
+#endif
 
 #define TILE      256     // subunits per city tile
 #define TILE_SH   8       // log2(TILE)
@@ -68,6 +109,8 @@ extern int32_t g_cam_cp, g_cam_sp;   // cos/sin of the current pitch, Q10
 // yaw is what stops the offset feeling like the camera is just mis-aimed.
 #if WR_ANDROID
 #define PROJ_CX   (PX(154) + (SCR_W - PX(200)) / 2)   // the watch's offset from the middle, whatever the width
+#elif WR_ROUND
+#define PROJ_CX   (SCR_W / 2 + PX(26))   // a circle has no room at its sides: nearer the middle
 #else
 #define PROJ_CX   PX(154)     // character sits right of centre, with room to his right
 #endif
@@ -93,8 +136,13 @@ extern int32_t g_horizon;      // screen y of the true horizon
 // Virtual analogue stick. Floating: wherever your thumb lands becomes centre,
 // so you never hunt for a pad you cannot see under your finger. It still
 // parks in the corner when idle so it stays discoverable.
+#if WR_ROUND
+#define STICK_HOME_X PX(60)   // inside the circle, clear of the bezel
+#define STICK_HOME_Y PX(165)
+#else
 #define STICK_HOME_X PX(38)   // resting position when nobody is touching it
 #define STICK_HOME_Y PX(190)
+#endif
 #define STICK_DEAD    PX(4)
 #define STICK_RANGE  PX(26)   // px from centre to full deflection
 

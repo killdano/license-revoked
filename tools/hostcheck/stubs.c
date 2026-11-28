@@ -22,6 +22,7 @@ GFont fonts_get_system_font(const char *k){(void)k;return 0;}
 void graphics_context_set_text_color(GContext *c, GColor g){(void)c;(void)g;}
 void graphics_draw_text(GContext *c,const char*t,GFont f,GRect b,GTextOverflowMode o,GTextAlignment a,void*x){(void)c;(void)t;(void)f;(void)b;(void)o;(void)a;(void)x;}
 void graphics_fill_circle(GContext *c, GPoint p, uint16_t r){(void)c;(void)p;(void)r;}
+void graphics_fill_radial(GContext *c, GRect r, GOvalScaleMode m, uint16_t i, int32_t a, int32_t b){(void)c;(void)r;(void)m;(void)i;(void)a;(void)b;}
 Layer *layer_create(GRect f){(void)f;return 0;}
 void layer_destroy(Layer *l){(void)l;}
 void layer_set_update_proc(Layer *l, LayerUpdateProc p){(void)l;(void)p;}

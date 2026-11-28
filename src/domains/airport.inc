@@ -441,7 +441,7 @@ static void draw_hud_in(GContext *ctx) {
   char line[16]; int n = 0;
   line[n++] = 'P'; line[n++] = 'A'; line[n++] = 'I'; line[n++] = 'D'; line[n++] = ' '; line[n++] = '$';
   n += gfx_utoa(line + n, 6, g_in.credit); line[n] = 0;
-  hud_text(ctx, line, FONT_KEY_GOTHIC_14_BOLD, 64, 32, 72, 16, GColorYellow);
+  hud_text(ctx, line, FONT_KEY_GOTHIC_14_BOLD, 64 + HUD_OX, 32 + HUD_IN_DY, 72, 16, GColorYellow);
 }
 #endif
 

@@ -339,9 +339,9 @@ DOM_SHARED void money_throw_in(void) {
 // The show's meter, on the HUD.
 static void draw_hud_in(GContext *ctx) {
   graphics_context_set_fill_color(ctx, GColorDarkGray);
-  graphics_fill_rect(ctx, GRect(60, 34, 80, 4), 1, GCornersAll);
+  graphics_fill_rect(ctx, GRect(60 + HUD_OX, 34 + HUD_IN_DY, 80, 4), 1, GCornersAll);
   graphics_context_set_fill_color(ctx, GColorMagenta);
-  graphics_fill_rect(ctx, GRect(60, 34, g_in.meter / 5, 4), 1, GCornersAll);
+  graphics_fill_rect(ctx, GRect(60 + HUD_OX, 34 + HUD_IN_DY, g_in.meter / 5, 4), 1, GCornersAll);
 }
 
 // The rescue. With every bouncer down, press beside a dancer and you pick

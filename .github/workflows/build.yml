@@ -76,6 +76,21 @@ jobs:
           print('::error title=pebble build failed::' + msg)
           EOF
 
+      # Each platform's text + data + bss as arm-none-eabi-size counts it, to
+      # compare builds and platforms. Not the firmware's own number (that
+      # one is a little smaller): a build over the real ceiling already
+      # fails in pebble build with "'H' format requires 0 <= number <= 65535".
+      - name: Image sizes
+        run: |
+          SIZE=$(find ~/.local/share/pebble-sdk -name arm-none-eabi-size -type f | head -1)
+          [ -n "$SIZE" ] || { echo "::warning::arm-none-eabi-size not found"; exit 0; }
+          msg=""
+          for elf in build/*/pebble-app.elf; do
+            p=$(basename "$(dirname "$elf")")
+            msg="$msg $p $("$SIZE" "$elf" | awk 'NR==2 {print $1+$2+$3}') B;"
+          done
+          echo "::notice title=Image size (text+data+bss)::$msg $(grep -h '^arenas' build.log | tr '\n' ' ')"
+
       - name: Check the build
         env:
           BRANCH: ${{ github.ref_name }}

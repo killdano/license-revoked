@@ -1,0 +1,160 @@
+name: Emulator pictures
+
+# Runs the game in the Pebble emulator and takes pictures of it, so the
+# layout on a watch nobody here owns (the Round 2, gabbro) can be looked at.
+#
+# - Actions tab -> Emulator pictures -> Run workflow, on any branch.
+# - A push to a claude/ branch that changes the game's source runs it too.
+#
+# Pictures: the "screens" artifact, and a commit of screens/<platform>/ to
+# the branch it ran on (never to main: from main it only uploads the
+# artifact). The emulator's GPS, touch and timing are not a watch's; these
+# show the layout, nothing more.
+
+on:
+  workflow_dispatch:
+    inputs:
+      platforms:
+        description: 'Platforms (space separated)'
+        required: false
+        default: 'gabbro emery'
+  push:
+    branches: ['claude/**']
+    paths:
+      - 'src/**'
+      - 'wscript'
+      - 'package.json'
+      - '.github/workflows/screens.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: screens-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  screens:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      PLATFORMS: ${{ inputs.platforms || 'gabbro emery' }}
+      DISPLAY: ':99'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Cache the Pebble SDK
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/share/pebble-sdk
+          key: pebble-sdk-${{ runner.os }}-v1
+
+      - name: Install the Pebble SDK
+        run: |
+          pip install uv pebble-tool pillow
+          if ! yes | pebble sdk install latest > sdk.log 2>&1 && ! grep -q "already installed" sdk.log; then
+            cat sdk.log
+            echo "::error title=Pebble SDK install failed::$(tail -20 sdk.log | sed 's/%/%25/g' | sed ':a;N;$!ba;s/\n/%0A/g')"
+            exit 1
+          fi
+
+      # qemu-pebble links against SDL2 and friends, which the runner lacks.
+      - name: Emulator libraries
+        run: |
+          sudo apt-get update -q > /dev/null
+          for p in xvfb libsdl2-2.0-0 libpixman-1-0 libfdt1 libslirp0 libglib2.0-0t64 libpng16-16t64; do
+            sudo apt-get install -y -q --no-install-recommends "$p" >> apt.log 2>&1 || echo "apt: no $p"
+          done
+          Xvfb :99 -screen 0 800x600x24 > /dev/null 2>&1 &
+
+      - name: Build
+        run: |
+          set -o pipefail
+          if ! pebble build > build.log 2>&1; then
+            tail -60 build.log
+            echo "::error title=Build failed::$(tail -30 build.log | sed 's/%/%25/g' | sed ':a;N;$!ba;s/\n/%0A/g')"
+            exit 1
+          fi
+
+      - name: Take the pictures
+        run: |
+          PBW=$(ls build/*.pbw | head -1)
+          rc=0
+          shot() {   # shot <platform> <name>
+            timeout 60 pebble screenshot --emulator "$1" --no-open "screens/$1/$2.png" > /dev/null 2>&1 \
+              || echo "::warning title=Screenshot $1 $2::failed"
+          }
+          btn() {    # btn <platform> <button>
+            timeout 30 pebble emu-button --emulator "$1" click "$2" > /dev/null 2>&1 || echo "button $2 failed"
+          }
+          for P in $PLATFORMS; do
+            echo "=== $P"
+            mkdir -p "screens/$P"
+            rm -f "screens/$P/"*.png
+            pebble kill > /dev/null 2>&1 || true
+            if ! timeout 300 pebble install --emulator "$P" "$PBW" > "install-$P.log" 2>&1; then
+              echo "::error title=Emulator $P::$(tail -25 "install-$P.log" | sed 's/%/%25/g' | sed ':a;N;$!ba;s/\n/%0A/g')"
+              rc=1
+              continue
+            fi
+            ( timeout 600 pebble logs --emulator "$P" > "logs-$P.txt" 2>&1 & )
+            sleep 12
+            shot "$P" 1_street
+            sleep 6
+            shot "$P" 2_street_later
+            btn "$P" down; btn "$P" down; btn "$P" down
+            sleep 2
+            shot "$P" 3_turned
+            btn "$P" back            # the pause menu
+            sleep 2
+            shot "$P" 4_menu
+            btn "$P" select          # Map
+            sleep 2
+            shot "$P" 5_map
+            btn "$P" select          # back to the menu
+            btn "$P" back            # and to the game
+            sleep 2
+            shot "$P" 6_back_in_game
+            pkill -f "pebble logs" || true
+            pebble kill > /dev/null 2>&1 || true
+          done
+          ls -l screens/*/ || true
+          exit $rc
+
+      - name: Report
+        if: always()
+        run: |
+          for f in logs-*.txt install-*.log; do
+            [ -f "$f" ] || continue
+            echo "::notice title=$f::$(tail -30 "$f" | sed 's/%/%25/g' | sed ':a;N;$!ba;s/\n/%0A/g')"
+          done
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: screens
+          path: screens/
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Commit the pictures
+        if: always() && github.ref_name != 'main'
+        env:
+          BRANCH: ${{ github.ref_name }}
+          RUN: ${{ github.run_number }}
+        run: |
+          [ -d screens ] || exit 0
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A screens
+          if git diff --cached --quiet; then echo "nothing new"; exit 0; fi
+          git commit -q -m "Emulator pictures (run $RUN)"
+          for i in 1 2 3; do
+            git push origin "HEAD:$BRANCH" && exit 0
+            git pull -q --rebase --autostash origin "$BRANCH" || break
+          done
+          echo "::warning title=Emulator pictures::could not push to $BRANCH; the artifact has the files"

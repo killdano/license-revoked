@@ -80,16 +80,40 @@ static void keys_tick(void) {
   if (s_sel_frames >= 6) game_touch_move(STICK_HOME_X, (int16_t)(STICK_HOME_Y - STICK_RANGE));
 }
 #else
+#if WR_ROUND
+// A round watch that delivers no touch (or has it switched off) plays the
+// emulator's way: SELECT held is the throttle, tapped is the action. Decided
+// when the window loads.
+static bool s_keys;
+static uint8_t s_sel_frames;
+static void keys_tick(void) {
+  if (!s_sel_frames) return;
+  if (s_sel_frames < 250) s_sel_frames++;
+  if (s_sel_frames == 6) game_touch_down(STICK_HOME_X, STICK_HOME_Y);
+  if (s_sel_frames >= 6) game_touch_move(STICK_HOME_X, (int16_t)(STICK_HOME_Y - STICK_RANGE));
+}
+#endif
 // Press and release only: the game decides on release whether it was a
 // tap (the action) or a hold (the car door, or the trigger).
 static void action_down(ClickRecognizerRef r, void *c) {
   (void)r; (void)c;
   if (g_menu.open) { menu_select(); return; }
+#if WR_ROUND
+  if (s_keys) { s_sel_frames = 1; return; }
+#endif
   game_input_hold(true);
 }
 
 static void action_up(ClickRecognizerRef r, void *c) {
   (void)r; (void)c;
+#if WR_ROUND
+  if (s_keys) {
+    if (s_sel_frames && s_sel_frames < 6) game_input_action();
+    s_sel_frames = 0;
+    game_touch_up();
+    return;
+  }
+#endif
   game_input_hold(false);
 }
 #endif
@@ -147,6 +171,8 @@ static void tick(void *data) {
   if (g_menu.quit) { window_stack_pop_all(true); return; }
 #ifdef WR_KEYS
   keys_tick();
+#elif WR_ROUND
+  if (s_keys) keys_tick();
 #endif
   touch_flush();                       // the newest finger position, once per frame
   game_step();
@@ -166,6 +192,9 @@ static void window_load(Window *window) {
   if (touch_service_is_enabled()) {
     touch_service_subscribe(touch_handler, NULL);
   }
+#if WR_ROUND && !defined(WR_KEYS)
+  else s_keys = true;
+#endif
 }
 
 static void window_unload(Window *window) {

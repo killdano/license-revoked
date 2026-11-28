@@ -84,12 +84,29 @@ static void update_arrest(void) {
 // The grip: a bar that fills as the officer gets hold of you.
 static void draw_hud_t(GContext *ctx) {
   if (!g_p.arrest) return;
+#if WR_ROUND
+  // On the round watch the grip fills a curve along the bottom of the
+  // bezel, dot by dot, the way the other bars bend round the circle.
+  int w = (g_p.arrest * 13) / ARREST_FRAMES; if (w > 13) w = 13;
+  for (int i = 0; i < 13; i++) {
+    uint16_t a = (uint16_t)(32768 + (i - 6) * 1092);             // six degrees apart, round six o'clock
+    GPoint q = GPoint((int)(HUD_RC + ((fsin(a) * (HUD_RC - 10)) >> 10)),
+                      (int)(HUD_RC - ((fcos(a) * (HUD_RC - 10)) >> 10)));
+    graphics_context_set_fill_color(ctx, GColorBlack);
+    graphics_fill_circle(ctx, q, 5);
+    if (12 - i < w) {            // fills from the left
+      graphics_context_set_fill_color(ctx, GColorBlue);
+      graphics_fill_circle(ctx, q, 3);
+    }
+  }
+#else
   int hw = SCR_W * 228 / SCR_H;
   int w = (g_p.arrest * 60) / ARREST_FRAMES; if (w > 60) w = 60;
   graphics_context_set_fill_color(ctx, GColorBlack);
   graphics_fill_rect(ctx, GRect(hw / 2 - 31, 228 - 20, 62, 8), 2, GCornersAll);
   graphics_context_set_fill_color(ctx, GColorBlue);
   graphics_fill_rect(ctx, GRect(hw / 2 - 30, 228 - 19, w, 6), 2, GCornersAll);
+#endif
 }
 
 static int dom_dispatch(int op, int arg) {
